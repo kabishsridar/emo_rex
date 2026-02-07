@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 HR Emotion Helpdesk</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .main-panel {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+        }
+
+        .controls-bar {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .connection-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-group label {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #555;
+            margin-bottom: 5px;
+        }
+
+        .input-field {
+            padding: 8px 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: #1e3c72;
+            box-shadow: 0 0 0 3px rgba(30, 60, 114, 0.1);
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(30, 60, 114, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+            color: white;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-connected {
+            background: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
+        .status-disconnected {
+            background: #ff6b6b;
+        }
+
+        .video-feeds {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            overflow-y: auto;
+            max-height: 600px;
+        }
+
+        .hr-local-feed {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hr-local-feed::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="20" cy="20" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="80" cy="80" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="40" cy="60" r="0.5" fill="rgba(255,255,255,0.05)"/></svg>');
+            pointer-events: none;
+        }
+
+        .hr-video-container {
+            position: relative;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            background: #000;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        #hrVideoElement {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 15px;
+        }
+
+        #hrCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        .feeds-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .feed-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .feed-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .feed-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .feed-name {
+            font-weight: 600;
+        }
+
+        .feed-status {
+            font-size: 0.8rem;
+            opacity: 0.9;
+        }
+
+        .feed-video {
+            width: 100%;
+            height: 200px;
+            background: #000;
+            object-fit: cover;
+        }
+
+        .feed-emotion {
+            padding: 12px 15px;
+            background: #f8f9fa;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .emotion-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .emotion-emoji {
+            font-size: 1.5rem;
+        }
+
+        .emotion-text {
+            font-weight: 600;
+        }
+
+        .feed-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .feed-btn {
+            padding: 6px 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .feed-btn:focus {
+            transform: scale(0.95);
+        }
+
+        .sidebar {
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            gap: 20px;
+        }
+
+        .stats-panel, .analytics-panel, .controls-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .emotion-chart {
+            width: 100%;
+            height: 200px;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            backdrop-filter: blur(10px);
+            max-width: 300px;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            border-left: 4px solid #4CAF50;
+        }
+
+        .notification.error {
+            border-left: 4px solid #ff6b6b;
+        }
+
+        .notification.info {
+            border-left: 4px solid #1e3c72;
+        }
+
+        .alert-card {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .alert-text {
+            font-weight: 600;
+        }
+
+        .alert-action {
+            padding: 5px 10px;
+            background: rgba(255, 255, 255, 0.8);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+
+            .controls-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .feeds-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-chart-line"></i> HR Emotion Helpdesk</h1>
+            <p>Monitor workplace emotional wellness in real-time</p>
+        </div>
+
+        <div class="dashboard">
+            <div class="main-panel">
+                <div class="controls-bar">
+                    <div class="connection-controls">
+                        <div class="input-group">
+                            <label for="serverIP">Server IP Address</label>
+                            <input type="text" id="serverIP" class="input-field" placeholder="e.g., 192.168.1.100" value="localhost">
+                        </div>
+                        <div class="input-group">
+                            <label for="roomId">Room ID</label>
+                            <input type="text" id="roomId" class="input-field" placeholder="Enter room ID" value="workplace-2026">
+                        </div>
+                        <div class="input-group">
+                            <label for="hrName">HR Name</label>
+                            <input type="text" id="hrName" class="input-field" placeholder="Your name" value="HR Manager">
+                        </div>
+                    </div>
+                    <div class="connection-controls">
+                        <button id="connectBtn" class="btn btn-primary">
+                            <i class="fas fa-link"></i> Connect
+                        </button>
+                        <button id="disconnectBtn" class="btn btn-danger" style="display: none;">
+                            <i class="fas fa-unlink"></i> Disconnect
+                        </button>
+                        <div style="display: flex; align-items: center; margin-left: 15px;">
+                            <span id="statusIndicator" class="status-indicator status-disconnected"></span>
+                            <span id="statusText">Disconnected</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hr-local-feed">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="color: white;"><i class="fas fa-brain"></i> HR Emotion Monitor</h3>
+                        <div>
+                            <button id="startHRCameraBtn" class="btn btn-success" style="font-size: 0.8rem; padding: 8px 15px;">
+                                <i class="fas fa-play"></i> Start Camera
+                            </button>
+                            <button id="stopHRCameraBtn" class="btn btn-danger" style="font-size: 0.8rem; padding: 8px 15px; display: none;">
+                                <i class="fas fa-stop"></i> Stop Camera
+                            </button>
+                            <button id="toggleHRBarsBtn" class="btn btn-primary" style="font-size: 0.8rem; padding: 8px 15px; display: none;">
+                                <i class="fas fa-chart-bar"></i> Toggle Bars
+                            </button>
+                            <button id="hrScreenshotBtn" class="btn btn-primary" style="font-size: 0.8rem; padding: 8px 15px; display: none;">
+                                <i class="fas fa-camera"></i> Screenshot
+                            </button>
+                        </div>
+                    </div>
+                    <div class="hr-video-container">
+                        <video id="hrVideoElement" autoplay muted playsinline style="display: none;"></video>
+                        <canvas id="hrCanvas"></canvas>
+                        <div style="position: absolute; top: 20px; left: 20px; color: white; font-size: 1.2rem; font-weight: bold; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 10px;">
+                            <i class="fas fa-user-tie"></i> HR Live Feed
+                        </div>
+                    </div>
+                </div>
+
+                <div class="video-feeds">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="color: #333;"><i class="fas fa-video"></i> Live Employee Feeds</h3>
+                        <button id="refreshStatsBtn" class="btn btn-success" style="font-size: 0.8rem; padding: 8px 15px;">
+                            <i class="fas fa-sync-alt"></i> Refresh Stats
+                        </button>
+                    </div>
+                    <div id="feedsGrid" class="feeds-grid">
+                        <!-- Employee feeds will be added here dynamically -->
+                        <div class="feed-card" id="noFeedsCard">
+                            <div style="padding: 40px; text-align: center; color: #666;">
+                                <i class="fas fa-users" style="font-size: 3rem; margin-bottom: 15px;"></i>
+                                <p>No employees connected yet.<br>Waiting for connections...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="stats-panel">
+                    <h4 style="margin-bottom: 15px; color: #333;"><i class="fas fa-chart-bar"></i> Room Statistics</h4>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="totalClients">0</div>
+                            <div class="stat-label">Total Clients</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="activeEmployees">0</div>
+                            <div class="stat-label">Active Employees</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="activeHR">0</div>
+                            <div class="stat-label">HR Staff</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="avgEmotion">😐</div>
+                            <div class="stat-label">Avg Emotion</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="analytics-panel">
+                    <h4 style="margin-bottom: 15px; color: #333;"><i class="fas fa-brain"></i> Emotion Analytics</h4>
+                    <canvas id="emotionChart" class="emotion-chart"></canvas>
+                </div>
+
+                <div class="controls-panel">
+                    <h4 style="margin-bottom: 15px; color: #333;"><i class="fas fa-cogs"></i> HR Controls</h4>
+                    <div style="margin-bottom: 15px;">
+                        <textarea id="announcementText" class="input-field" placeholder="Type announcement message..." rows="3"></textarea>
+                    </div>
+                    <button id="sendAnnouncementBtn" class="btn btn-primary" style="width: 100%; margin-bottom: 10px;">
+                        <i class="fas fa-bullhorn"></i> Send Announcement
+                    </button>
+                    <div id="alertsContainer">
+                        <!-- Alert cards will be added here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification">
+        <div id="notificationContent">Welcome to HR Emotion Helpdesk!</div>
+    </div>
+
+    <script>
+        // Configuration - Will be updated when connecting
+        let SERVER_IP = 'localhost';
+        let SERVER_URL = `http://${SERVER_IP}:5000`;
+        let socket = null;
+
+        let isConnected = false;
+        let employeeFeeds = {};
+        let emotionChart = null;
+        let roomStats = {};
+
+        // HR Local Camera Variables
+        let hrStream = null;
+        let hrVideo = null;
+        let hrCanvas = null;
+        let hrCtx = null;
+        let hrAnimationId = null;
+        let hrFrameCount = 0;
+        let hrLastEmotions = {};
+        let hrShowBars = true;
+
+        // Emotion configuration from emotion_tracking.py
+        const EMOTION_COLORS = {
+            'angry': [0, 0, 255, 255],      // Red - RGBA for canvas
+            'disgust': [0, 128, 0, 255],    // Dark Green
+            'fear': [128, 0, 128, 255],     // Purple
+            'happy': [0, 255, 255, 255],    // Yellow
+            'sad': [255, 0, 0, 255],        // Blue
+            'surprise': [0, 165, 255, 255], // Orange
+            'neutral': [200, 200, 200, 255] // Gray
+        };
+
+        const emotionEmojis = {
+            'angry': '😠',
+            'disgust': '🤢',
+            'fear': '😨',
+            'happy': '😊',
+            'sad': '😢',
+            'surprise': '😲',
+            'neutral': '😐'
+        };
+
+        // Drawing functions adapted from emotion_tracking.py
+        function drawFancyBox(ctx, x1, y1, x2, y2, color, thickness = 2) {
+            ctx.strokeStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${color[3] / 255})`;
+            ctx.lineWidth = thickness;
+            ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+            // Corner length
+            const cornerLen = Math.min(20, (x2 - x1) / 4, (y2 - y1) / 4);
+
+            ctx.lineWidth = thickness + 2;
+
+            // Top-left corner
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x1 + cornerLen, y1);
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x1, y1 + cornerLen);
+            ctx.stroke();
+
+            // Top-right corner
+            ctx.beginPath();
+            ctx.moveTo(x2, y1);
+            ctx.lineTo(x2 - cornerLen, y1);
+            ctx.moveTo(x2, y1);
+            ctx.lineTo(x2, y1 + cornerLen);
+            ctx.stroke();
+
+            // Bottom-left corner
+            ctx.beginPath();
+            ctx.moveTo(x1, y2);
+            ctx.lineTo(x1 + cornerLen, y2);
+            ctx.moveTo(x1, y2);
+            ctx.lineTo(x1, y2 - cornerLen);
+            ctx.stroke();
+
+            // Bottom-right corner
+            ctx.beginPath();
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - cornerLen, y2);
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2, y2 - cornerLen);
+            ctx.stroke();
+        }
+
+        function drawLabelBox(ctx, text, x, y, color) {
+            ctx.font = '14px Arial';
+            const textMetrics = ctx.measureText(text);
+            const textWidth = textMetrics.width;
+            const textHeight = 16;
+
+            // Semi-transparent background
+            ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.7)`;
+            ctx.fillRect(x, y - textHeight - 10, textWidth + 20, textHeight + 10);
+
+            // Text
+            ctx.fillStyle = 'white';
+            ctx.fillText(text, x + 10, y - 5);
+        }
+
+        function drawEmotionBar(ctx, emotionsDict, x, y, width = 150, height = 15) {
+            let yOffset = 0;
+            const sortedEmotions = Object.entries(emotionsDict)
+                .sort((a, b) => b[1] - a[1]);
+
+            for (const [emotion, score] of sortedEmotions) {
+                const color = EMOTION_COLORS[emotion] || [200, 200, 200, 255];
+
+                // Background bar
+                ctx.fillStyle = 'rgba(50, 50, 50, 0.8)';
+                ctx.fillRect(x, y + yOffset, width, height);
+
+                // Filled bar
+                const barWidth = (width * score) / 100;
+                ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.9)`;
+                ctx.fillRect(x, y + yOffset, barWidth, height);
+
+                // Label
+                ctx.fillStyle = 'white';
+                ctx.font = '10px Arial';
+                const label = `${emotion.substring(0, 3).toUpperCase()}: ${score.toFixed(0)}%`;
+                ctx.fillText(label, x + 5, y + yOffset + height - 3);
+
+                yOffset += height + 2;
+            }
+        }
+
+        // Show notification
+        function showNotification(message, type = 'info') {
+            const notification = document.getElementById('notification');
+            const notificationContent = document.getElementById('notificationContent');
+            notificationContent.textContent = message;
+            notification.className = `notification ${type} show`;
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Initialize emotion chart
+        function initEmotionChart() {
+            const ctx = document.getElementById('emotionChart').getContext('2d');
+            emotionChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Happy', 'Sad', 'Angry', 'Neutral', 'Surprise', 'Fear', 'Disgust'],
+                    datasets: [{
+                        data: [0, 0, 0, 0, 0, 0, 0],
+                        backgroundColor: [
+                            '#4CAF50', '#2196F3', '#FF5722', '#9E9E9E',
+                            '#FF9800', '#9C27B0', '#795548'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 10,
+                                usePointStyle: true
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update emotion chart
+        function updateEmotionChart(emotionData) {
+            if (!emotionChart) return;
+
+            const emotions = ['happy', 'sad', 'angry', 'neutral', 'surprise', 'fear', 'disgust'];
+            const data = emotions.map(emotion => emotionData[emotion] || 0);
+
+            emotionChart.data.datasets[0].data = data;
+            emotionChart.update();
+        }
+
+        // Create employee feed card
+        function createEmployeeFeed(clientId, userName) {
+            const feedCard = document.createElement('div');
+            feedCard.className = 'feed-card';
+            feedCard.id = `feed-${clientId}`;
+
+            feedCard.innerHTML = `
+                <div class="feed-header">
+                    <div class="feed-name">${userName}</div>
+                    <div class="feed-status">Connecting...</div>
+                </div>
+                <img class="feed-video" id="video-${clientId}" src="" alt="Employee feed">
+                <div class="feed-emotion">
+                    <div class="emotion-display">
+                        <span class="emotion-emoji">😐</span>
+                        <span class="emotion-text" id="emotion-${clientId}">Analyzing...</span>
+                    </div>
+                    <div class="feed-actions">
+                        <button class="feed-btn" onclick="focusEmployee('${clientId}')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="feed-btn" onclick="messageEmployee('${clientId}')">
+                            <i class="fas fa-comment"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            employeeFeeds[clientId] = {
+                card: feedCard,
+                name: userName,
+                lastEmotion: 'neutral',
+                lastUpdate: Date.now()
+            };
+
+            return feedCard;
+        }
+
+        // Update employee feed
+        function updateEmployeeFeed(clientId, frameData, emotionData) {
+            const feed = employeeFeeds[clientId];
+            if (!feed) return;
+
+            const videoEl = document.getElementById(`video-${clientId}`);
+            const emotionEl = document.getElementById(`emotion-${clientId}`);
+            const emojiEl = feed.card.querySelector('.emotion-emoji');
+
+            if (videoEl && frameData) {
+                videoEl.src = frameData;
+            }
+
+            if (emotionData && emotionEl) {
+                const dominant = emotionData.dominant_emotion;
+                const confidence = emotionData.emotions[dominant] || 0;
+                emotionEl.textContent = `${dominant.toUpperCase()} ${confidence.toFixed(0)}%`;
+                emojiEl.textContent = emotionEmojis[dominant] || '😐';
+                feed.lastEmotion = dominant;
+                feed.lastUpdate = Date.now();
+
+                // Update feed status
+                const statusEl = feed.card.querySelector('.feed-status');
+                statusEl.textContent = 'Active';
+                statusEl.style.color = '#4CAF50';
+            }
+        }
+
+        // Focus on employee
+        function focusEmployee(clientId) {
+            const feed = employeeFeeds[clientId];
+            if (feed) {
+                socket.emit('hr_command', {
+                    command: 'request_emotion_focus',
+                    target_client: clientId
+                });
+                showNotification(`Requested emotion focus from ${feed.name}`, 'info');
+            }
+        }
+
+        // Message employee
+        function messageEmployee(clientId) {
+            const feed = employeeFeeds[clientId];
+            if (feed) {
+                const message = prompt(`Message to ${feed.name}:`);
+                if (message) {
+                    socket.emit('hr_command', {
+                        command: 'send_message',
+                        target_client: clientId,
+                        message: message
+                    });
+                    showNotification(`Message sent to ${feed.name}`, 'success');
+                }
+            }
+        }
+
+        // HR Local Camera Functions
+        async function startHRCamera() {
+            try {
+                hrStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 1280, height: 720 },
+                    audio: false
+                });
+
+                hrVideo = document.getElementById('hrVideoElement');
+                hrCanvas = document.getElementById('hrCanvas');
+                hrCtx = hrCanvas.getContext('2d');
+
+                hrVideo.srcObject = hrStream;
+
+                hrVideo.addEventListener('loadedmetadata', () => {
+                    hrCanvas.width = hrVideo.videoWidth;
+                    hrCanvas.height = hrVideo.videoHeight;
+                    hrVideo.style.display = 'block';
+                    startHRVideoProcessing();
+                });
+
+                document.getElementById('startHRCameraBtn').style.display = 'none';
+                document.getElementById('stopHRCameraBtn').style.display = 'inline-block';
+                document.getElementById('toggleHRBarsBtn').style.display = 'inline-block';
+                document.getElementById('hrScreenshotBtn').style.display = 'inline-block';
+
+                showNotification('HR camera started successfully', 'success');
+            } catch (error) {
+                console.error('HR Camera error:', error);
+                showNotification('Failed to access HR camera', 'error');
+            }
+        }
+
+        function stopHRCamera() {
+            if (hrStream) {
+                hrStream.getTracks().forEach(track => track.stop());
+                hrStream = null;
+            }
+
+            if (hrAnimationId) {
+                cancelAnimationFrame(hrAnimationId);
+                hrAnimationId = null;
+            }
+
+            if (hrCanvas) {
+                hrCtx.clearRect(0, 0, hrCanvas.width, hrCanvas.height);
+            }
+
+            hrLastEmotions = {};
+            hrFrameCount = 0;
+
+            document.getElementById('startHRCameraBtn').style.display = 'inline-block';
+            document.getElementById('stopHRCameraBtn').style.display = 'none';
+            document.getElementById('toggleHRBarsBtn').style.display = 'none';
+            document.getElementById('hrScreenshotBtn').style.display = 'none';
+
+            showNotification('HR camera stopped', 'info');
+        }
+
+        function startHRVideoProcessing() {
+            function processFrame() {
+                if (!hrVideo || !hrCanvas || !hrCtx || !hrStream) return;
+
+                hrFrameCount++;
+
+                // Draw the video frame to canvas
+                hrCtx.drawImage(hrVideo, 0, 0, hrCanvas.width, hrCanvas.height);
+
+                // Add title overlay like in emotion_tracking.py
+                hrCtx.fillStyle = 'rgba(30, 30, 30, 0.8)';
+                hrCtx.fillRect(0, 0, 400, 40);
+
+                hrCtx.fillStyle = '#00FFFF';
+                hrCtx.font = 'bold 16px Arial';
+                hrCtx.fillText('HR EMOTION MONITOR', 10, 25);
+
+                // Add face count and controls hint
+                hrCtx.fillStyle = 'white';
+                hrCtx.font = '12px Arial';
+                hrCtx.fillText(`Frame: ${hrFrameCount}`, 10, 60);
+
+                const activeFaces = Object.keys(hrLastEmotions).length;
+                hrCtx.fillText(`Faces: ${activeFaces}`, 10, 80);
+
+                // Send frame for emotion analysis every 3rd frame
+                if (hrFrameCount % 3 === 0) {
+                    const frameData = hrCanvas.toDataURL('image/jpeg', 0.8);
+                    socket.emit('hr_emotion_frame', {
+                        frame: frameData,
+                        frame_count: hrFrameCount
+                    });
+                }
+
+                hrAnimationId = requestAnimationFrame(processFrame);
+            }
+
+            processFrame();
+        }
+
+        // Handle HR emotion results
+        socket.on('hr_emotion_result', (data) => {
+            if (!hrCanvas || !hrCtx) return;
+
+            const emotions = data.emotions;
+            const dominant = data.dominant_emotion;
+            const bbox = data.bbox;
+
+            if (emotions && bbox) {
+                // Clear previous drawings
+                hrCtx.clearRect(0, 0, hrCanvas.width, hrCanvas.height);
+                hrCtx.drawImage(hrVideo, 0, 0, hrCanvas.width, hrCanvas.height);
+
+                const [x1, y1, x2, y2] = bbox;
+                const color = EMOTION_COLORS[dominant] || [0, 255, 0, 255];
+
+                // Draw fancy bounding box (same as emotion_tracking.py)
+                drawFancyBox(hrCtx, x1, y1, x2, y2, color, 3);
+
+                // Create and draw label
+                const confidence = emotions[dominant] || 0;
+                const label = `${dominant.toUpperCase()} ${confidence.toFixed(0)}%`;
+                drawLabelBox(hrCtx, label, x1, y1 - 5, color);
+
+                // Draw emotion bars if enabled and there's space
+                if (hrShowBars && x2 + 170 < hrCanvas.width) {
+                    drawEmotionBar(hrCtx, emotions, x2 + 10, y1, 150, 12);
+                }
+
+                // Store for caching
+                hrLastEmotions[data.face_index || 0] = { emotions, dominant };
+            }
+        });
+
+        // Connect to server
+        function connectToServer() {
+            SERVER_IP = document.getElementById('serverIP').value.trim();
+            SERVER_URL = `http://${SERVER_IP}:5000`;
+
+            // Disconnect existing socket if any
+            if (socket) {
+                socket.disconnect();
+            }
+
+            // Create new socket connection
+            socket = io(SERVER_URL);
+
+            // Set up event listeners
+            setupSocketListeners();
+
+            const roomId = document.getElementById('roomId').value.trim();
+            const hrName = document.getElementById('hrName').value.trim() || 'HR Manager';
+
+            if (!roomId) {
+                showNotification('Please enter a room ID', 'error');
+                return;
+            }
+
+            socket.emit('join_room', {
+                room_id: roomId,
+                user_type: 'hr',
+                user_name: hrName
+            });
+
+            document.getElementById('connectBtn').disabled = true;
+            document.getElementById('connectBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting...';
+        }
+
+        // Set up socket event listeners
+        function setupSocketListeners() {
+            socket.on('connect', () => {
+                console.log('Connected to server');
+            });
+
+            socket.on('disconnect', () => {
+                handleDisconnect();
+            });
+
+            // Handle successful connection
+            socket.on('room_status', (data) => {
+                isConnected = true;
+                document.getElementById('connectBtn').style.display = 'none';
+                document.getElementById('disconnectBtn').style.display = 'block';
+                document.getElementById('statusIndicator').className = 'status-indicator status-connected';
+                document.getElementById('statusText').textContent = `Connected to ${data.room_id} (${SERVER_IP})`;
+                showNotification(`Connected to room: ${data.room_id}`, 'success');
+
+                // Update room stats
+                updateRoomStats(data.clients);
+
+                // Start periodic stats refresh
+                setInterval(() => {
+                    if (isConnected) {
+                        socket.emit('get_room_stats');
+                    }
+                }, 5000);
+            });
+
+            // Handle user joined
+            socket.on('user_joined', (data) => {
+                if (data.user_type === 'employee') {
+                    const feedCard = createEmployeeFeed(data.client_id, data.user_name);
+                    document.getElementById('feedsGrid').insertBefore(feedCard, document.getElementById('noFeedsCard'));
+                    document.getElementById('noFeedsCard').style.display = 'none';
+                    showNotification(`${data.user_name} joined the room`, 'success');
+                }
+                socket.emit('get_room_stats');
+            });
+
+            // Handle user disconnected
+            socket.on('user_disconnected', (data) => {
+                const feedCard = document.getElementById(`feed-${data.client_id}`);
+                if (feedCard) {
+                    feedCard.remove();
+                    delete employeeFeeds[data.client_id];
+                    showNotification(`${data.user_name} left the room`, 'info');
+
+                    // Show no feeds card if no employees left
+                    if (Object.keys(employeeFeeds).length === 0) {
+                        document.getElementById('noFeedsCard').style.display = 'block';
+                    }
+                }
+                socket.emit('get_room_stats');
+            });
+
+            // Handle employee frame updates
+            socket.on('employee_frame', (data) => {
+                updateEmployeeFeed(data.client_id, data.frame, null);
+            });
+
+            // Handle emotion updates
+            socket.on('emotion_update', (data) => {
+                updateEmployeeFeed(data.client_id, null, data);
+            });
+
+            // Handle room stats
+            socket.on('room_stats', (data) => {
+                updateRoomStats(data);
+            });
+
+            // Handle connection errors
+            socket.on('error', (data) => {
+                showNotification(data.message, 'error');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('connectBtn').innerHTML = '<i class="fas fa-link"></i> Connect';
+            });
+        }
+
+        // Disconnect from server
+        function disconnectFromServer() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+            handleDisconnect();
+        }
+
+        // Handle disconnection
+        function handleDisconnect() {
+            isConnected = false;
+            document.getElementById('connectBtn').style.display = 'block';
+            document.getElementById('disconnectBtn').style.display = 'none';
+            document.getElementById('statusIndicator').className = 'status-indicator status-disconnected';
+            document.getElementById('statusText').textContent = 'Disconnected';
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('connectBtn').innerHTML = '<i class="fas fa-link"></i> Connect';
+
+            // Clear all feeds
+            Object.keys(employeeFeeds).forEach(clientId => {
+                const feedCard = document.getElementById(`feed-${clientId}`);
+                if (feedCard) feedCard.remove();
+            });
+            employeeFeeds = {};
+            document.getElementById('noFeedsCard').style.display = 'block';
+
+            // Stop HR camera
+            stopHRCamera();
+
+            showNotification('Disconnected from monitoring', 'info');
+        }
+
+        // Update room statistics
+        function updateRoomStats(stats) {
+            roomStats = stats;
+            document.getElementById('totalClients').textContent = stats.total_clients || 0;
+            document.getElementById('activeEmployees').textContent = stats.employees || 0;
+            document.getElementById('activeHR').textContent = stats.hrs || 0;
+            document.getElementById('avgEmotion').textContent = emotionEmojis[stats.most_common_emotion] || '😐';
+
+            // Update emotion chart
+            updateEmotionChart(stats.emotion_distribution || {});
+        }
+
+        // Send announcement
+        document.getElementById('sendAnnouncementBtn').addEventListener('click', () => {
+            const message = document.getElementById('announcementText').value.trim();
+            if (message && socket) {
+                socket.emit('hr_command', {
+                    command: 'broadcast_message',
+                    message: message
+                });
+                document.getElementById('announcementText').value = '';
+                showNotification('Announcement sent to all employees', 'success');
+            }
+        });
+
+        // Refresh stats
+        document.getElementById('refreshStatsBtn').addEventListener('click', () => {
+            if (isConnected && socket) {
+                socket.emit('get_room_stats');
+                showNotification('Statistics refreshed', 'info');
+            }
+        });
+
+        // HR control buttons
+        document.getElementById('startHRCameraBtn').addEventListener('click', startHRCamera);
+        document.getElementById('stopHRCameraBtn').addEventListener('click', stopHRCamera);
+
+        document.getElementById('toggleHRBarsBtn').addEventListener('click', () => {
+            hrShowBars = !hrShowBars;
+            const btn = document.getElementById('toggleHRBarsBtn');
+            btn.innerHTML = hrShowBars ?
+                '<i class="fas fa-chart-bar"></i> Hide Bars' :
+                '<i class="fas fa-chart-bar"></i> Show Bars';
+            showNotification(`Emotion bars ${hrShowBars ? 'ON' : 'OFF'}`, 'info');
+        });
+
+        document.getElementById('hrScreenshotBtn').addEventListener('click', () => {
+            if (hrCanvas) {
+                const link = document.createElement('a');
+                link.download = `hr_emotion_screenshot_${hrFrameCount}.png`;
+                link.href = hrCanvas.toDataURL();
+                link.click();
+                showNotification('Screenshot saved!', 'success');
+            }
+        });
+
+        // Connection buttons
+        document.getElementById('connectBtn').addEventListener('click', connectToServer);
+        document.getElementById('disconnectBtn').addEventListener('click', disconnectFromServer);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopHRCamera();
+            if (socket) {
+                socket.disconnect();
+            }
+        });
+
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            initEmotionChart();
+            showNotification('Welcome to HR Emotion Helpdesk!', 'success');
+        });
+    </script>
+</body>
+</html>
