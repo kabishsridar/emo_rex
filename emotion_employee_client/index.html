@@ -76,6 +76,16 @@
             border-radius: 15px;
         }
 
+        #videoCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 15px;
+            pointer-events: none;
+        }
+
         .emotion-overlay {
             position: absolute;
             top: 20px;
@@ -335,6 +345,7 @@
                 </div>
                 <div class="video-container">
                     <video id="videoElement" autoplay muted playsinline></video>
+                    <canvas id="videoCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></canvas>
                     <div class="emotion-overlay" id="emotionOverlay">
                         <span id="emotionEmoji">😐</span>
                         <span id="emotionText">Analyzing...</span>
@@ -407,6 +418,100 @@
         const currentEmotion = document.getElementById('currentEmotion');
         const emotionConfidence = document.getElementById('emotionConfidence');
         const emotionOverlay = document.getElementById('emotionOverlay');
+        const videoCanvas = document.getElementById('videoCanvas');
+        const canvasCtx = videoCanvas.getContext('2d');
+
+        // Emotion colors (BGR format converted to RGBA for canvas)
+        const EMOTION_COLORS = {
+            'angry': [0, 0, 255, 255],      // Red
+            'disgust': [0, 128, 0, 255],    // Dark Green
+            'fear': [128, 0, 128, 255],     // Purple
+            'happy': [0, 255, 255, 255],    // Yellow
+            'sad': [255, 0, 0, 255],        // Blue
+            'surprise': [0, 165, 255, 255], // Orange
+            'neutral': [200, 200, 200, 255] // Gray
+        };
+
+        // Drawing functions for emotion visualization
+        function drawFancyBox(ctx, x1, y1, x2, y2, color, thickness = 2) {
+            // Draw main rectangle
+            ctx.strokeStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${color[3] / 255})`;
+            ctx.lineWidth = thickness;
+            ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+            // Corner length
+            const cornerLen = Math.min(20, (x2 - x1) / 4, (y2 - y1) / 4);
+
+            // Top-left corner
+            ctx.lineWidth = thickness + 2;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x1 + cornerLen, y1);
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x1, y1 + cornerLen);
+
+            // Top-right corner
+            ctx.moveTo(x2, y1);
+            ctx.lineTo(x2 - cornerLen, y1);
+            ctx.moveTo(x2, y1);
+            ctx.lineTo(x2, y1 + cornerLen);
+
+            // Bottom-left corner
+            ctx.moveTo(x1, y2);
+            ctx.lineTo(x1 + cornerLen, y2);
+            ctx.moveTo(x1, y2);
+            ctx.lineTo(x1, y2 - cornerLen);
+
+            // Bottom-right corner
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - cornerLen, y2);
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2, y2 - cornerLen);
+
+            ctx.stroke();
+        }
+
+        function drawLabelBox(ctx, text, x, y, color, bgAlpha = 0.7) {
+            ctx.font = 'bold 16px Inter, Arial, sans-serif';
+            const textMetrics = ctx.measureText(text);
+            const textWidth = textMetrics.width;
+            const textHeight = 16;
+
+            // Semi-transparent background
+            ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${bgAlpha})`;
+            ctx.fillRect(x, y - textHeight - 10, textWidth + 20, textHeight + 10);
+
+            // Text
+            ctx.fillStyle = 'white';
+            ctx.fillText(text, x + 10, y - 5);
+        }
+
+        function drawEmotionBar(ctx, emotionsDict, x, y, width = 150, height = 15) {
+            let yOffset = 0;
+            const sortedEmotions = Object.entries(emotionsDict)
+                .sort(([, a], [, b]) => b - a);
+
+            for (const [emotion, score] of sortedEmotions) {
+                const color = EMOTION_COLORS[emotion] || [200, 200, 200, 255];
+
+                // Background bar
+                ctx.fillStyle = 'rgba(50, 50, 50, 1)';
+                ctx.fillRect(x, y + yOffset, width, height);
+
+                // Filled bar (score is 0-100 from DeepFace)
+                const barWidth = (width * score) / 100;
+                ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)`;
+                ctx.fillRect(x, y + yOffset, barWidth, height);
+
+                // Label
+                const label = `${emotion.substring(0, 3).toUpperCase()}: ${score.toFixed(0)}%`;
+                ctx.font = 'bold 10px Inter, Arial, sans-serif';
+                ctx.fillStyle = 'white';
+                ctx.fillText(label, x + 5, y + yOffset + height - 3);
+
+                yOffset += height + 2;
+            }
+        }
         const emotionEmoji = document.getElementById('emotionEmoji');
         const emotionText = document.getElementById('emotionText');
         const notification = document.getElementById('notification');
@@ -527,6 +632,7 @@
             socket.on('server_emotion_result', (data) => {
                 const emotions = data.emotions;
                 const dominant = data.dominant_emotion;
+                const bbox = data.bbox;
 
                 // Update current emotion display
                 currentEmotion.textContent = emotionEmojis[dominant] || '😐';
@@ -537,6 +643,31 @@
                 emotionOverlay.style.display = 'block';
                 emotionEmoji.textContent = emotionEmojis[dominant] || '😐';
                 emotionText.textContent = `${dominant.toUpperCase()} ${confidence.toFixed(0)}%`;
+
+                // Draw emotion visualization on video canvas
+                if (bbox && canvasCtx && videoElement.videoWidth > 0) {
+                    // Set canvas size to match video
+                    videoCanvas.width = videoElement.videoWidth;
+                    videoCanvas.height = videoElement.videoHeight;
+
+                    // Clear previous drawings
+                    canvasCtx.clearRect(0, 0, videoCanvas.width, videoCanvas.height);
+
+                    const [x1, y1, x2, y2] = bbox;
+                    const color = EMOTION_COLORS[dominant] || [0, 255, 0, 255];
+
+                    // Draw fancy bounding box
+                    drawFancyBox(canvasCtx, x1, y1, x2, y2, color, 3);
+
+                    // Create and draw label
+                    const label = `${dominant.toUpperCase()} ${confidence.toFixed(0)}%`;
+                    drawLabelBox(canvasCtx, label, x1, y1 - 5, color);
+
+                    // Draw emotion bars if there's space (right side of face)
+                    if (x2 + 170 < videoCanvas.width) {
+                        drawEmotionBar(canvasCtx, emotions, x2 + 10, y1, 150, 12);
+                    }
+                }
 
                 // Send emotion update to HR
                 socket.emit('emotion_update', {

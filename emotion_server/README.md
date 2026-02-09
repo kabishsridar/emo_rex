@@ -24,7 +24,7 @@ Central server component for the distributed Emotion HR monitoring system.
 3. **Update model path (if needed):**
    Edit `emotion_tracking.py` and update the YOLO model path:
    ```python
-   YOLO_MODEL_PATH = r"D:\\path\\to\\yolov8n-face.pt"
+   YOLO_MODEL_PATH = r"D:\\arun-pt2\\yolov8n-face.pt"
    ```
 
 ### Running the Server

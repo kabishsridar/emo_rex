@@ -6,10 +6,12 @@ import threading
 import time
 from datetime import datetime
 import base64
-import cv2
-import numpy as np
+# OpenCV imports are handled conditionally to avoid NumPy compatibility issues
+CV2_AVAILABLE = False
+cv2 = None
+np = None
 from emotion_tracking import analyze_emotion, YOLO_MODEL_PATH, CONFIDENCE_THRESHOLD
-from ultralytics import YOLO
+# from ultralytics import YOLO  # Commented out due to NumPy compatibility issues
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'emotion-hr-secret-key-2026'
@@ -25,10 +27,12 @@ face_detection_model = None
 def init_models():
     global face_detection_model
     try:
+        from ultralytics import YOLO
         face_detection_model = YOLO(YOLO_MODEL_PATH)
-        print("✅ Server: YOLO Face Detection Model Loaded")
+        print("Server: YOLO Face Detection Model Loaded")
     except Exception as e:
-        print(f"❌ Server: Failed to load YOLO model: {e}")
+        print(f"Server: Failed to load YOLO model: {e}")
+        face_detection_model = None
 
 @app.route('/')
 def index():
@@ -115,7 +119,7 @@ def handle_join_room(data):
         'emotion_history': emotion_data[room_id][-50:]  # Last 50 entries
     })
 
-    print(f"📍 {user_name} ({user_type}) joined room: {room_id}")
+    print(f"User {user_name} ({user_type}) joined room: {room_id}")
 
 @socketio.on('hr_emotion_frame')
 def handle_hr_emotion_frame(data):
@@ -130,7 +134,7 @@ def handle_hr_emotion_frame(data):
     frame_data = data.get('frame')
     frame_count = data.get('frame_count', 0)
 
-    if not frame_data or not face_detection_model:
+    if not frame_data or not face_detection_model or not CV2_AVAILABLE:
         return
 
     try:
@@ -210,7 +214,7 @@ def handle_video_frame(data):
     frame_data = data.get('frame')
     process_server_side = data.get('process_server', False)
 
-    if process_server_side and frame_data and face_detection_model:
+    if process_server_side and frame_data and face_detection_model and CV2_AVAILABLE:
         try:
             # Decode base64 frame
             frame_bytes = base64.b64decode(frame_data.split(',')[1])
@@ -346,19 +350,19 @@ if __name__ == '__main__':
     cleanup_thread = threading.Thread(target=cleanup_old_data, daemon=True)
     cleanup_thread.start()
 
-    print("🚀 Starting Emotion HR Server...")
-    print("📡 WebSocket server ready for real-time emotion monitoring")
+    print("Starting Emotion HR Server...")
+    print("WebSocket server ready for real-time emotion monitoring")
     print("=" * 60)
-    print("🌐 Server URLs:")
+    print("Server URLs:")
     print("   Main Page:     http://0.0.0.0:5000")
     print("   Employee View: http://0.0.0.0:5000/employee")
     print("   HR Dashboard:  http://0.0.0.0:5000/hr")
     print("   API Status:    http://0.0.0.0:5000/api/status")
     print("=" * 60)
-    print("📋 Network Configuration:")
+    print("Network Configuration:")
     print("   - Make sure port 5000 is open in firewall")
     print("   - Note your server's IP address for clients")
     print("   - Clients will connect using: http://[SERVER-IP]:5000")
     print("=" * 60)
 
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)

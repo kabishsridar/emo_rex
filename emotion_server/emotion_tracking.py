@@ -1,6 +1,26 @@
-import cv2
-from ultralytics import YOLO
-from deepface import DeepFace
+# Computer vision libraries are imported conditionally to avoid NumPy compatibility issues
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
+    cv2 = None
+
+try:
+    from ultralytics import YOLO
+    YOLO_AVAILABLE = True
+except ImportError:
+    YOLO_AVAILABLE = False
+    YOLO = None
+
+try:
+    from deepface import DeepFace
+    DEEPFACE_AVAILABLE = True
+except ImportError:
+    DEEPFACE_AVAILABLE = False
+    DeepFace = None
+
+# Standard library imports
 import numpy as np
 
 # ============ CONFIGURATION ============
@@ -90,6 +110,9 @@ def draw_emotion_bar(frame, emotions_dict, x, y, width=150, height=15):
 
 def analyze_emotion(face_img):
     """Analyze emotion using DeepFace"""
+    if not CV2_AVAILABLE or not DEEPFACE_AVAILABLE:
+        return None, None
+
     try:
         # DeepFace expects BGR image
         result = DeepFace.analyze(
@@ -111,16 +134,29 @@ def analyze_emotion(face_img):
 
 def main():
     print("=" * 50)
-    print("🎭 EMOTION RECOGNITION SYSTEM")
+    print("EMOTION RECOGNITION SYSTEM")
     print("=" * 50)
+
+    if not CV2_AVAILABLE:
+        print("OpenCV not available. Cannot run emotion recognition.")
+        return
+
+    if not YOLO_AVAILABLE:
+        print("YOLO (ultralytics) not available. Cannot run emotion recognition.")
+        return
+
+    if not DEEPFACE_AVAILABLE:
+        print("DeepFace not available. Cannot run emotion recognition.")
+        return
+
     print("Loading models...")
 
     # Load YOLO face detection model
     model = YOLO(YOLO_MODEL_PATH)
-    print("✅ YOLO Face Detection Model Loaded")
+    print("YOLO Face Detection Model Loaded")
 
     # Initialize DeepFace (it downloads models on first use)
-    print("✅ DeepFace Emotion Detector Ready")
+    print("DeepFace Emotion Detector Ready")
 
     # Start webcam
     cap = cv2.VideoCapture(0)

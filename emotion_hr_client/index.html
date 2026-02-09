@@ -77,6 +77,13 @@
             display: flex;
             align-items: center;
             gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .connection-buttons {
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
 
         .input-group {
@@ -125,6 +132,17 @@
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(30, 60, 114, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn:disabled:hover {
+            transform: none !important;
+            box-shadow: none !important;
         }
 
         .btn-success {
@@ -410,6 +428,19 @@
             .controls-bar {
                 flex-direction: column;
                 align-items: stretch;
+                gap: 20px;
+            }
+
+            .connection-buttons {
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .btn {
+                min-width: 120px;
+                font-size: 0.85rem;
+                padding: 8px 16px;
             }
 
             .feeds-grid {
@@ -446,9 +477,12 @@
                             <input type="text" id="hrName" class="input-field" placeholder="Your name" value="HR Manager">
                         </div>
                     </div>
-                    <div class="connection-controls">
+                    <div class="connection-buttons">
                         <button id="connectBtn" class="btn btn-primary">
                             <i class="fas fa-link"></i> Connect
+                        </button>
+                        <button id="testBtn" class="btn btn-success" style="font-size: 0.8rem; padding: 8px 12px;">
+                            <i class="fas fa-vial"></i> Test
                         </button>
                         <button id="disconnectBtn" class="btn btn-danger" style="display: none;">
                             <i class="fas fa-unlink"></i> Disconnect
@@ -556,7 +590,7 @@
 
     <script>
         // Configuration - Will be updated when connecting
-        let SERVER_IP = 'localhost';
+        let SERVER_IP = '10.128.71.52';  // Default to the working server IP
         let SERVER_URL = `http://${SERVER_IP}:5000`;
         let socket = null;
 
@@ -598,6 +632,7 @@
 
         // Drawing functions adapted from emotion_tracking.py
         function drawFancyBox(ctx, x1, y1, x2, y2, color, thickness = 2) {
+            // Draw main rectangle
             ctx.strokeStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${color[3] / 255})`;
             ctx.lineWidth = thickness;
             ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
@@ -605,14 +640,33 @@
             // Corner length
             const cornerLen = Math.min(20, (x2 - x1) / 4, (y2 - y1) / 4);
 
-            ctx.lineWidth = thickness + 2;
-
             // Top-left corner
+            ctx.lineWidth = thickness + 2;
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x1 + cornerLen, y1);
             ctx.moveTo(x1, y1);
             ctx.lineTo(x1, y1 + cornerLen);
+
+            // Top-right corner
+            ctx.moveTo(x2, y1);
+            ctx.lineTo(x2 - cornerLen, y1);
+            ctx.moveTo(x2, y1);
+            ctx.lineTo(x2, y1 + cornerLen);
+
+            // Bottom-left corner
+            ctx.moveTo(x1, y2);
+            ctx.lineTo(x1 + cornerLen, y2);
+            ctx.moveTo(x1, y2);
+            ctx.lineTo(x1, y2 - cornerLen);
+
+            // Bottom-right corner
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - cornerLen, y2);
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2, y2 - cornerLen);
+
+            ctx.stroke();
             ctx.stroke();
 
             // Top-right corner
@@ -640,15 +694,19 @@
             ctx.stroke();
         }
 
-        function drawLabelBox(ctx, text, x, y, color) {
-            ctx.font = '14px Arial';
+        function drawLabelBox(ctx, text, x, y, color, bgAlpha = 0.7) {
+            ctx.font = 'bold 16px Inter, Arial, sans-serif';
             const textMetrics = ctx.measureText(text);
             const textWidth = textMetrics.width;
             const textHeight = 16;
 
-            // Semi-transparent background
-            ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.7)`;
+            // Create semi-transparent background
+            const imageData = ctx.getImageData(x, y - textHeight - 10, textWidth + 20, textHeight + 10);
+            ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${bgAlpha})`;
             ctx.fillRect(x, y - textHeight - 10, textWidth + 20, textHeight + 10);
+
+            // Restore original image data for transparency effect
+            // (Simplified version - in real implementation would blend properly)
 
             // Text
             ctx.fillStyle = 'white';
@@ -658,24 +716,24 @@
         function drawEmotionBar(ctx, emotionsDict, x, y, width = 150, height = 15) {
             let yOffset = 0;
             const sortedEmotions = Object.entries(emotionsDict)
-                .sort((a, b) => b[1] - a[1]);
+                .sort(([, a], [, b]) => b - a);
 
             for (const [emotion, score] of sortedEmotions) {
                 const color = EMOTION_COLORS[emotion] || [200, 200, 200, 255];
 
                 // Background bar
-                ctx.fillStyle = 'rgba(50, 50, 50, 0.8)';
+                ctx.fillStyle = 'rgba(50, 50, 50, 1)';
                 ctx.fillRect(x, y + yOffset, width, height);
 
-                // Filled bar
+                // Filled bar (score is 0-100 from DeepFace)
                 const barWidth = (width * score) / 100;
-                ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.9)`;
+                ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)`;
                 ctx.fillRect(x, y + yOffset, barWidth, height);
 
                 // Label
-                ctx.fillStyle = 'white';
-                ctx.font = '10px Arial';
                 const label = `${emotion.substring(0, 3).toUpperCase()}: ${score.toFixed(0)}%`;
+                ctx.font = 'bold 10px Inter, Arial, sans-serif';
+                ctx.fillStyle = 'white';
                 ctx.fillText(label, x + 5, y + yOffset + height - 3);
 
                 yOffset += height + 2;
@@ -965,8 +1023,16 @@
 
         // Connect to server
         function connectToServer() {
+            console.log('Connect button clicked');
             SERVER_IP = document.getElementById('serverIP').value.trim();
+
+            if (!SERVER_IP) {
+                showNotification('Please enter a server IP address', 'error');
+                return;
+            }
+
             SERVER_URL = `http://${SERVER_IP}:5000`;
+            console.log('Connecting to:', SERVER_URL);
 
             // Disconnect existing socket if any
             if (socket) {
@@ -974,7 +1040,12 @@
             }
 
             // Create new socket connection
-            socket = io(SERVER_URL);
+            socket = io(SERVER_URL, {
+                transports: ['websocket', 'polling'],
+                timeout: 10000,
+                forceNew: true,
+                reconnection: false
+            });
 
             // Set up event listeners
             setupSocketListeners();
@@ -987,6 +1058,15 @@
                 return;
             }
 
+            // Set a timeout for connection
+            const connectionTimeout = setTimeout(() => {
+                if (!isConnected) {
+                    console.log('Connection timeout');
+                    showNotification('Connection timeout. Please check server IP and try again.', 'error');
+                    handleDisconnect();
+                }
+            }, 10000); // 10 second timeout
+
             socket.emit('join_room', {
                 room_id: roomId,
                 user_type: 'hr',
@@ -995,15 +1075,29 @@
 
             document.getElementById('connectBtn').disabled = true;
             document.getElementById('connectBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting...';
+            document.getElementById('statusText').textContent = 'Connecting...';
+
+            // Clear timeout when room_status is received
+            socket.once('room_status', () => {
+                clearTimeout(connectionTimeout);
+            });
         }
 
         // Set up socket event listeners
         function setupSocketListeners() {
             socket.on('connect', () => {
                 console.log('Connected to server');
+                showNotification('Connected to server!', 'success');
+            });
+
+            socket.on('connect_error', (error) => {
+                console.error('Connection error:', error);
+                showNotification('Failed to connect to server: ' + error.message, 'error');
+                handleDisconnect();
             });
 
             socket.on('disconnect', () => {
+                console.log('Disconnected from server');
                 handleDisconnect();
             });
 
@@ -1167,7 +1261,14 @@
         });
 
         // Connection buttons
-        document.getElementById('connectBtn').addEventListener('click', connectToServer);
+        document.getElementById('connectBtn').addEventListener('click', (e) => {
+            console.log('Connect button clicked, calling connectToServer');
+            connectToServer();
+        });
+        document.getElementById('testBtn').addEventListener('click', () => {
+            console.log('Test button clicked');
+            showNotification('Test button works! JavaScript is functioning.', 'success');
+        });
         document.getElementById('disconnectBtn').addEventListener('click', disconnectFromServer);
 
         // Cleanup on page unload
