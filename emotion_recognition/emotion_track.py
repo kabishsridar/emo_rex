@@ -135,11 +135,13 @@ def main():
     print("   [Q] - Quit")
     print("   [S] - Screenshot")
     print("   [B] - Toggle emotion bars")
+    print("   [M] - Toggle mirror mode")
     print("=" * 50)
-    
+
     show_bars = True
+    mirror_mode = True  # Start with mirrored view (natural for users)
     frame_count = 0
-    
+
     # Cache for smoother display
     last_emotions = {}
     
@@ -147,8 +149,13 @@ def main():
         ret, frame = cap.read()
         if not ret:
             break
-        
+
         frame_count += 1
+
+        # Apply mirror effect if enabled (flip horizontally)
+        if mirror_mode:
+            frame = cv2.flip(frame, 1)  # 1 = horizontal flip
+
         display_frame = frame.copy()
         
         # Add title overlay
@@ -216,12 +223,18 @@ def main():
             last_emotions.clear()
         
         # Show face count
-        cv2.putText(display_frame, f"Faces: {face_count}", (10, 70), 
+        cv2.putText(display_frame, f"Faces: {face_count}", (10, 70),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+        # Show mirror mode indicator
+        mirror_indicator = "🪞 MIRRORED" if mirror_mode else "📷 NORMAL"
+        cv2.putText(display_frame, mirror_indicator, (display_frame.shape[1] - 150, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
         
         # Show controls hint
-        cv2.putText(display_frame, "Press Q to quit | S to screenshot | B to toggle bars", 
-                    (10, display_frame.shape[0] - 10), 
+        mirror_status = "ON" if mirror_mode else "OFF"
+        cv2.putText(display_frame, f"Press Q to quit | S to screenshot | B to toggle bars | M to toggle mirror ({mirror_status})",
+                    (10, display_frame.shape[0] - 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1)
         
         # Display the frame
@@ -229,7 +242,7 @@ def main():
         
         # Handle key presses
         key = cv2.waitKey(1) & 0xFF
-        
+
         if key == ord('q'):
             print("\n👋 Exiting...")
             break
@@ -240,6 +253,9 @@ def main():
         elif key == ord('b'):
             show_bars = not show_bars
             print(f"📊 Emotion bars: {'ON' if show_bars else 'OFF'}")
+        elif key == ord('m'):
+            mirror_mode = not mirror_mode
+            print(f"🪞 Mirror mode: {'ON' if mirror_mode else 'OFF'}")
     
     cap.release()
     cv2.destroyAllWindows()
